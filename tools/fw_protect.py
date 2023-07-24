@@ -50,6 +50,8 @@ if __name__ == '__main__':
     a. Create temporary copy of chunk, to remember which chunk caused an error
 3. Encrypts those chunks and hashes into AES-256-GCM 
 
+metadata = version, size, messagesize, tag
+
 """
 
 def temp_copy(padded_chunk_for_sha):
@@ -58,7 +60,7 @@ def temp_copy(padded_chunk_for_sha):
     storage.append(copied_temp)
     return storage
 
-def SHA_generator(padded_chunk_for_sha):
+def metadata(padded_chunk_for_sha):
     message_type = u16(ser.read(2))
     version = u16(ser.read(2))
     firmware_size = u16(ser.read(2))
