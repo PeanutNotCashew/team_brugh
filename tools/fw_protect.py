@@ -52,15 +52,18 @@ if __name__ == '__main__':
 
 """
 
-def temp_copy(padded_chunk_for_sha):
+def temp_copy():
     storage = []
     copied_temp = padded_chunk_for_sha 
     storage.append(copied_temp)
     return storage
 
 def SHA_generator():
-    padded_chunk_for_sha = '' 
+    version = u16(ser.read(2))
+    firmware_size = u16(ser.read(2))
+    message_size = u16(ser.read(2))
+    padded_chunk_for_sha = ser.read(size)
     h = SHA256.new(padded_chunk_for_sha)
     h.update(padded_chunk_for_sha)
-    ser.write(padded_chunk_for_sha)
-    return padded_chunk_for_sha
+    ser.write(version, firmware_size, message_size, h)
+    return padded_chunk_for_sha #key?
