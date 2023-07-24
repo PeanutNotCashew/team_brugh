@@ -58,13 +58,25 @@ def temp_copy(padded_chunk_for_sha):
     storage.append(copied_temp)
     return storage
 
+size = 32
+
 def SHA_generator(padded_chunk_for_sha):
+    message_type = u16(ser.read(2))
     version = u16(ser.read(2))
     firmware_size = u16(ser.read(2))
     message_size = u16(ser.read(2))
-    padded_chunk_for_sha = ser.read(size)
+    padded_chunk_for_cha = u16(ser.read(2))
+    
     h = SHA256.new(padded_chunk_for_sha)
     h.update(padded_chunk_for_sha)
-    sha_key = version+ firmware_size + message_size + h
+
+    version_packed = p16(version)
+    firmware_size_packed = p16(firmware_size)
+    message_size_packed = p16(message_size)
+
+    sha_key = version_packed + firmware_size_packed + message_size_packed + h.digest()
+
     ser.write(sha_key)
-    return padded_chunk_for_sha
+    
+    return None
+
