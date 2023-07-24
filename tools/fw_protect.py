@@ -9,7 +9,11 @@ Firmware Bundle-and-Protect Tool
 """
 import argparse
 import struct
-
+import ser, run_lab, lab_backends
+from Crypto.Signature import pkcs1_15
+from Crypto.Hash import SHA256
+from Crypto.PublicKey import RSA
+from pwn import *
 
 def protect_firmware(infile, outfile, version, message):
     # Load firmware binary from infile
@@ -39,3 +43,23 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     protect_firmware(infile=args.infile, outfile=args.outfile, version=int(args.version), message=args.message)
+
+""" 
+1. Pads data into chunks
+2. Generates hashes using  SHA-256
+    a. Create temporary copy of chunk, to remember which chunk caused an error
+3. Encrypts those chunks and hashes into AES-256-GCM 
+
+"""
+
+def SHA_generator():
+    padded_chunk_for_sha = '' # <- enter var for padded chunk
+    #temporary copy of chunk:
+    def temp_copy(padded_chunk_for_sha):
+        storage = []
+        copied_temp = padded_chunk_for_sha 
+        storage.append(copied_temp)
+        return storage
+    h = SHA256.new(padded_chunk_for_sha)
+    h.update(padded_chunk_for_sha)
+    ser.write(padded_chunk_for_sha)
