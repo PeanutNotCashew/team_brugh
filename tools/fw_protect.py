@@ -51,13 +51,15 @@ if __name__ == '__main__':
 3. Encrypts those chunks and hashes into AES-256-GCM 
 
 """
+
+def temp_copy(padded_chunk_for_sha):
+    storage = []
+    copied_temp = padded_chunk_for_sha 
+    storage.append(copied_temp)
+    return storage
+
 def SHA_generator():
     padded_chunk_for_sha = '' 
-    def temp_copy(padded_chunk_for_sha):
-        storage = []
-        copied_temp = padded_chunk_for_sha 
-        storage.append(copied_temp)
-        return storage
     h = SHA256.new(padded_chunk_for_sha)
     h.update(padded_chunk_for_sha)
     ser.write(padded_chunk_for_sha)
