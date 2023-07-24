@@ -65,5 +65,6 @@ def SHA_generator(padded_chunk_for_sha):
     padded_chunk_for_sha = ser.read(size)
     h = SHA256.new(padded_chunk_for_sha)
     h.update(padded_chunk_for_sha)
-    ser.write(version, firmware_size, message_size, h)
+    sha_key = version+ firmware_size + message_size + h
+    ser.write(sha_key)
     return padded_chunk_for_sha
