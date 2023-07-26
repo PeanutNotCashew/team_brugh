@@ -10,7 +10,7 @@ Firmware Bundle-and-Protect Tool
 import argparse
 import random
 from Crypto.Cipher import AES
-from  pwn import *
+from pwn import *
 
 def randPad(data, size):#Pads using random data cus we're too cool for pkcs7
 
@@ -24,7 +24,7 @@ def randPad(data, size):#Pads using random data cus we're too cool for pkcs7
 def encrypt(data, key, header):
 
     cipher = AES.new(key, AES.MODE_GCM)#instantiates an AES object
-    cipher.update(header)#Updates it to use common header (also on Stellaris)
+    cipher.update(header)#cipher.update(header)#Updates it to use common header (also on Stellaris)
     ciphertext, tag = cipher.encrypt_and_digest(data)#Encrypts the data
     # print("SIZE: " + str(len(ciphertext))) #DEBUG
     return(ciphertext + tag + cipher.nonce)#Returns encrypted data
@@ -81,6 +81,8 @@ def protect_firmware(infile, outfile, version, message, secret):
     with open(outfile, 'wb+') as outfile:
         outfile.write(firmware_blob)
     
+    print(firmware_blob)
+    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Firmware Update Tool')
     parser.add_argument("--infile", help="Path to the firmware image to protect.", required=True)
@@ -89,6 +91,8 @@ if __name__ == '__main__':
     parser.add_argument("--message", help="Release message for this firmware.", required=True)
     parser.add_argument("--secret", help="path to secret_build_output.txt", required=True)
     args = parser.parse_args()
+    
+    
 
     protect_firmware(infile=args.infile, outfile=args.outfile, version=int(args.version), message=args.message, secret=args.secret)#Calls the firmware protect method
     # EXAMPLE COMMAND TO RUN THIS CODE
