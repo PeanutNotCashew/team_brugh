@@ -5,14 +5,8 @@ from pwn import *
 from base64 import b64decode
 import json
 
-def decrypt(data, key, header):
+def decrypt(data, key, header):#Derypts a 48 byte frame into 16 bytes of data
     try:
-
-        #b64 = json.loads(json_input)
-
-        #json_k = [ 'nonce', 'header', 'ciphertext', 'tag' ]
-
-        #jv = {k:b64decode(b64[k]) for k in json_k}
 
         cipher = AES.new(key, AES.MODE_GCM, nonce=data[32:48])
 
@@ -46,7 +40,7 @@ with open ("../bootloader/secret_build_output.txt", "rb") as fp:
 frame_1 = firmware_blob[:48]
 f1d = decrypt(frame_1, key, header)#Frame 1 Decrypted
 
-print(u8(f1d[0:1], endian = "big"))
+print(u8(f1d[0:1], endian = "big"))#Parses data in accordance with frame chart
 print(u16(f1d[1:3], endian = "big"))
 print(u16(f1d[3:5], endian = "big"))
 print(u16(f1d[5:7], endian = "big"))
