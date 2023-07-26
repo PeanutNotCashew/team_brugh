@@ -4,6 +4,7 @@ from Crypto.Cipher import AES
 from pwn import *
 from base64 import b64decode
 import json
+import math
 
 def decrypt(data, key, header):#Derypts a 48 byte frame into 16 bytes of data
     try:
@@ -13,8 +14,6 @@ def decrypt(data, key, header):#Derypts a 48 byte frame into 16 bytes of data
         cipher.update(header)
 
         plaintext = cipher.decrypt_and_verify(data[:16], data[16 : 32])
-
-        print(plaintext)
 
     except (ValueError, KeyError):
 
@@ -44,3 +43,25 @@ print(u8(f1d[0:1], endian = "big"))#Parses data in accordance with frame chart
 print(u16(f1d[1:3], endian = "big"))
 print(u16(f1d[3:5], endian = "big"))
 print(u16(f1d[5:7], endian = "big"))
+
+fwSize = u16(f1d[3:5], endian = "big")
+
+iterTimes = math.ceil(fwSize / 16)
+print(iterTimes * 48)
+fw = b""
+for i in range(48, iterTimes * 48, 48):
+    temp = (decrypt(firmware_blob[i : i + 48], key, header))
+    fw += temp[1:]
+
+msg = b""
+msgSize = u16(f1d[5:7], endian = "big")
+msgIterTimes = math.ceil(msgSize / 16)
+print(msgIterTimes)
+
+for i in range(iterTimes * 48 + 48, msgIterTimes * 48 + iterTimes * 48 + 48 + 48, 48):
+    temp = (decrypt(firmware_blob[i : i + 48], key, header))
+    msg += temp[1:]
+  
+print(fw)  
+print(b"MESSAGE: " + msg)
+
