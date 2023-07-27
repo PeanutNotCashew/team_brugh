@@ -21,6 +21,8 @@ from Crypto.Cipher import AES
 REPO_ROOT = pathlib.Path(__file__).parent.parent.absolute()
 BOOTLOADER_DIR = os.path.join(REPO_ROOT, "bootloader")
 
+def arrayize(binary_string):
+    return '{' + ', '.join([hex(char) for char in binary_string]) + '}'
 
 def copy_initial_firmware(binary_path: str):
     # Copy the initial firmware binary to the bootloader build directory

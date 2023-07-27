@@ -1,10 +1,15 @@
 // Library Imports
 #include <string.h>
-#include <bearssl.h>
-//#include "beaverssl.h"
+#include <run_lab.h>
+#include "bearssl.h"
+//#include <beaverssl.h>
 #include <stdio.h>
 #include <stdint.h>
 #include "keys.h"
+
+int gcm_decrypt_and_verify(char* key, char* iv, char* ct, int ct_len, char* aad, int aad_len, char* tag);
+
+
 int main(){
     printf("%x\n", HEADER[0]);
 
@@ -27,7 +32,23 @@ int main(){
         nonce[i] = frame[i + 32];
     }
 
-
+    
 
 }
 
+
+int gcm_decrypt_and_verify(char* key, char* iv, char* ct, int ct_len, char* aad, int aad_len, char* tag) {
+    br_aes_ct_ctr_keys bc;
+    br_gcm_context gc;
+    br_aes_ct_ctr_init(&bc, key, 16);
+    br_gcm_init(&gc, &bc.vtable, br_ghash_ctmul32);
+
+    br_gcm_reset(&gc, iv, 16);         
+    br_gcm_aad_inject(&gc, aad, aad_len);    
+    br_gcm_flip(&gc);                        
+    br_gcm_run(&gc, 0, ct, ct_len);   
+    if (br_gcm_check_tag(&gc, tag)) {
+        return 1;
+    }
+    return 0; 
+}

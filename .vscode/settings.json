@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "run_lab.h": "c",
+        "beaverssl.h": "c"
+    }
+}
