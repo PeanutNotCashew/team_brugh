@@ -13,6 +13,9 @@ from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
 from  pwn import *
 
+def arrayize(binary_string):
+    return '{' + ', '.join([hex(char) for char in binary_string]) + '}'
+
 def randPad(data, size):#Pads using random data cus we're too cool for pkcs7
     toPad = len(data) % size
     randData = b""
@@ -80,6 +83,8 @@ def protect_firmware(infile, outfile, version, message, secret):
     # Write encrypted firmware blob to outfile
     with open(outfile, 'wb+') as outfile:
         outfile.write(firmware_blob)
+        
+    print(arrayize(beginFrame))
 
 
 if __name__ == '__main__':
