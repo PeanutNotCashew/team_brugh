@@ -321,10 +321,8 @@ void load_firmware(void){
     error_counter = 0;
 
     // Write new firmware size and version to Flash AKA start frame info
-    uint32_t metadata[2];
-    metadata[0] = version;
-    metadata[1] = f_size; 
-    program_flash(METADATA_BASE, metadata, 4);
+    uint32_t metadata = ((f_size & 0xFFFF) << 16) | (version & 0xFFFF);
+    program_flash(METADATA_BASE, (uint8_t *)(&metadata), 4);
 
     uart_write(UART1, OK); // Acknowledge the metadata.
 
