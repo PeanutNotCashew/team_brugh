@@ -89,7 +89,7 @@ def protect_firmware(infile, outfile, version, message, secret):
 
     # Create START frame
     # Temp is the type + version num + firmware len + RM len + padding
-    temp = randPad(p8(1, endian = "little") + p16(version, endian = "little") + p16(len(firmware), endian = "little") + p16(len(message), endian = "little"), 16)
+    temp = randPad(p8(1, endian = "little") + p16(version, endian = "little") + p16(len(firmware), endian = "little") + p16(len(messageBin), endian = "little"), 16)
     begin = encrypt(temp, key, header)
 
     # Create END frame
