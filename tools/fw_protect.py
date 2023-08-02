@@ -11,6 +11,8 @@ import argparse
 import random
 from Crypto.Cipher import AES
 from pwn import *
+from Crypto.Hash import SHA256
+
 
 # Pads the input data using random characters
 # Takes the data to be padded, and the completed size
@@ -32,14 +34,14 @@ def randPad(data, size):
 # Returns the encypted data
 def encrypt(data, key, header):
     # Set up the AES object with the key, mode, and header/aad
-    cipher = AES.new(key, AES.MODE_GCM)
-    cipher.update(header)
 
-    # Encrypts the data
-    ciphertext, tag = cipher.encrypt_and_digest(data)
-    
+    h = SHA256.new()
+    print(len(data))
+    h.update(data)
+
+    print(h.hexdigest())
     # Returns encrypted data, tag, and nonce/IV
-    return(ciphertext + tag + cipher.nonce)
+    return(data + h.digest())
 
 # Packages the firmware
 # Takes firmware location, output location,
@@ -61,48 +63,47 @@ def protect_firmware(infile, outfile, version, message, secret):
     fwEncrypt = b""
     i = 0
     # Breaks into chunks
-    for i in range (0, len(firmware), 15):
+    for i in range (0, len(firmware), 1024):
         # Check if the firmware fills a full 0xF chunk
-        if ((len(firmware) - i) // 15 != 0):
-            temp = p8(2, endian = "little") + firmware[i : i + 15] # Message type + firmware
-            fwEncrypt += temp
+        if ((len(firmware) - i) // 1024 != 0):
+            temp =  firmware[i : i + 1024] # Message type + firmware
+            fwEncrypt += p8(2, endian = "little") + encrypt(temp, key, header)
     # If the last chunk is not a 0xF chunk, pads and encrypts
-    if (len(firmware) % 15 != 0):
-        temp = randPad((p8(2, endian = "little") + firmware[i : len(firmware)]), 16) # Message type + firmware + padding
-        fwEncrypt += temp
+    if (len(firmware) % 1024 != 0):
+        temp = randPad(( firmware[i : len(firmware)]), 1024) # Message type + firmware + padding
+        fwEncrypt += p8(2, endian = "little") + encrypt(temp, key, header)
 
     # Encode and encrypt the release message
     messageBin = message.encode()
     messageBin += b"\x00"
     rmEncrypt = b""
     # Breaks into chunks
-    for i in range (0, len(messageBin), 15):
+    for i in range (0, len(messageBin), 1024):
         # Check if message fills a full 0xF chunk
-        if ((len(messageBin) - i) // 15 != 0):
-            temp = p8(2, endian = "little") + messageBin[i : i + 15] # Type and RM
-            rmEncrypt += temp
+        if ((len(messageBin) - i) // 1024 != 0):
+            temp = messageBin[i : i + 1024] # Type and RM
+            rmEncrypt += p8(2, endian = "little") + encrypt(temp, key, header)
 
     # If the last chunk is not a 0xF chunk, pads and encrypts
-    if (len(messageBin) % 15 != 0):
-        temp = randPad((p8(2, endian = "little") + messageBin[i : len(firmware)]), 16) # Type, RM, null byte, and padding
-        rmEncrypt += temp
+    if (len(messageBin) % 1024 != 0):
+        temp = randPad((messageBin[i : len(firmware)]), 1024) # Type, RM, null byte, and padding
+        rmEncrypt += p8(2, endian = "little") + encrypt(temp, key, header)
 
     # Create START frame
     # Temp is the type + version num + firmware len + RM len + padding
-    temp = randPad(p8(1, endian = "little") + p16(version, endian = "little") + p16(len(firmware), endian = "little") + p16(len(messageBin), endian = "little"), 16)
-    begin = temp
+    temp = randPad(p16(version, endian = "little") + p16(len(firmware), endian = "little") + p16(len(messageBin), endian = "little"), 1024)
+    begin = p8(1, endian = "little") + encrypt(temp, key, header)
 
     # Create END frame
     # Temp is the type + padding
-    temp = randPad(p8(3, endian = "little"), 16)
-    end = temp
 
     # For debugging?
     # print(begin)
     
     # Smush the START frame, encrypted firmware and RM, and END frame together
-    firmware_blob = begin + fwEncrypt + rmEncrypt + end
+    firmware_blob = begin + fwEncrypt + rmEncrypt
     print(firmware_blob)
+    print(len(firmware_blob))
     # Write encrypted firmware blob to outfile
     with open(outfile, 'wb+') as outfile:
         outfile.write(firmware_blob)
