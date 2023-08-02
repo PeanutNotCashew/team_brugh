@@ -16,7 +16,7 @@ OK = b"\x00"
 ERROR = b"\x01"
 END = b"\x02"
 
-FRAME_SIZE = 1073
+FRAME_SIZE = 1057
 
 # Sends START frame
 # Takes serial object, meta frame, and debug
@@ -38,7 +38,7 @@ def send_frame(ser, frame, debug=False):
 
     # If debug mode on, prints out frame to be sent
     if debug:
-        print_hex(frame)
+        print_hex(frame[1025:])
 
     falsetimes = 0 # Error counter
     failed = True # Stores if sent frame was successful
@@ -89,11 +89,11 @@ def update(ser, infile, debug):
         firmware_blob = fp.read()
 
     # Send START frame
-    metadata = firmware_blob[:1073]
+    metadata = firmware_blob[:1057]
     send_metadata(ser, metadata, debug=debug)
 
     # Send DATA, MESSAGE, and END frames
-    firmware = firmware_blob[1073:]
+    firmware = firmware_blob[1057:]
     for idx, frame_start in enumerate(range(0, len(firmware), FRAME_SIZE)):
         # Chunk and write frames
         data = firmware[frame_start : frame_start + FRAME_SIZE]
