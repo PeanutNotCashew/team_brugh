@@ -14,7 +14,7 @@
 
 // Library Imports
 #include <string.h>
-#include <bearssl_aead.h> // Crypto library
+#include <beaverssl.h> // Crypto library
 
 // Application Imports
 #include "uart.h"
@@ -54,8 +54,7 @@ uint8_t *fw_release_message_address;
 void uart_write_hex_bytes(uint8_t uart, uint8_t * start, uint32_t len);
 
 // Firmware Buffer
-unsigned char complete_data[FLASH_PAGESIZE];
-unsigned char backup[FLASH_PAGESIZE];
+unsigned char data[FLASH_PAGESIZE];
 
 /* ****************************************************************
  *
@@ -186,7 +185,7 @@ void load_initial_firmware(void){
  * 
  * ****************************************************************
  */
-int frame_decrypt(uint8_t *arr){
+int frame_decrypt(uint8_t *arr, uint8_t type){
     // Misc vars for reading
     int read = 0;
     uint32_t rcv = 0;
@@ -197,45 +196,24 @@ int frame_decrypt(uint8_t *arr){
     uint8_t nonce[16];
 
     // Reads the packet
-    for (int i = 0; i < 16; i += 1) {
+    type = uart_read(UART1, BLOCKING, &read);     // Message Type
+    for (int i = 0; i < FLASH_PAGESIZE; i += 1) { // Data
         rcv = uart_read(UART1, BLOCKING, &read);
         arr[i] = rcv;
     }
-    for (int i = 0; i < 16; i += 1) {
+    for (int i = 0; i < 16; i += 1) {             // Tag
         rcv = uart_read(UART1, BLOCKING, &read);
         tag[i] = rcv;
     }
-    for (int i = 0; i < 16; i += 1) {
+    for (int i = 0; i < 16; i += 1) {             // Nonce
         rcv = uart_read(UART1, BLOCKING, &read);
         nonce[i] = rcv;
     }
 
-    /*
-    for (int i = 0; i < 1024; i += 1) {
-        backup[i] = complete_data[i];
-    }*/
-
-    // Initialize the GCM, with counter and GHASH
-    br_aes_ct_ctr_keys counter;
-    br_gcm_context context;
-    br_aes_ct_ctr_init(&counter, KEY, 16); // Note: KEY is a macro in keys.h
-    br_gcm_init(&context, &counter.vtable, br_ghash_ctmul32);
-
-    // Add nonce and header
-    br_gcm_reset(&context, nonce, 16);
-    br_gcm_aad_inject(&context, HEADER, 16); // HEADER is also a macro in keys.h
-    br_gcm_flip(&context);
-
-    // Decrypt data
-    br_gcm_run(&context, 0, arr, 16);
-
-    /*for (int i = 0; i < 1024; i += 1) {
-        complete_data[i] = backup[i];
-    }
-    */
+    int no_error = gcm_decrypt_and_verify(KEY, nonce, arr, FLASH_PAGESIZE, HEADER, 16, tag);
 
     // Check GHASH
-    if (br_gcm_check_tag(&context, tag)) {
+    if (no_error) {
         return 0;
     } else {
         return 1;
@@ -254,7 +232,7 @@ int frame_decrypt(uint8_t *arr){
 void load_firmware(void){
     uart_write_str(UART2, "\nUpdate started\n");
 
-    uint8_t chunk_arr[16];   // Stores 1 packet, and is overwritten every decrypt
+    uint8_t type;
     int error = 0;              // stores frame_decrypt return
     int error_counter = 0;
 
@@ -270,10 +248,7 @@ void load_firmware(void){
     // Read START frame and checks for errors
     do {
         // Read frame
-        int read = 0;
-        for (int i = 0; i < 16; i += 1) {
-            chunk_arr[i] = uart_read(UART1, BLOCKING, &read);
-        }
+        error = frame_decrypt(chunk_arr, type);
 
         // Get version (0x2)
         version = (uint16_t)chunk_arr[1];
@@ -306,7 +281,7 @@ void load_firmware(void){
         if (error == 1){
             uart_write_str(UART2, "Incorrect GHASH\n");
         // Check for incorrect message type
-        } else if (chunk_arr[0] != 1){
+        } else if (type != 1){
             uart_write_str(UART2, "Incorrect Message Type\n");
             error = 1;
         // If version less than old version, reject and reset
@@ -348,21 +323,18 @@ void load_firmware(void){
 
     // ************************************************************
     // Process DATA frames
-    for (int i = 0; i < f_size; i += 15){
+    for (int i = 0; i < f_size; i += FLASH_PAGESIZE){
         // Reading and checking for errors
         do {
-            // Read frames
-            int read = 0;
-            for (int i = 0; i < 16; i += 1) {
-                chunk_arr[i] = uart_read(UART1, BLOCKING, &read);
-            }
+            // Read frame
+            error = frame_decrypt(data, type);
 
             // Error handling
             if (error == 1){
                 uart_write_str(UART2, "Incorrect GHASH\n");
                 uart_write(UART1, TYPE);
                 uart_write(UART1, ERROR);
-            }else if (chunk_arr[0] != 2){
+            }else if (type != 2){
                 uart_write_str(UART2, "Incorrect Message Type\n");
                 uart_write(UART1, TYPE);
                 uart_write(UART1, ERROR);
@@ -386,155 +358,48 @@ void load_firmware(void){
         uart_write_hex(UART2, i);
         nl(UART2);
 
-        // Writing to flash
-        for (int j = 1; j < 16; j++) {
-            // Get the data that will be written
-            if (f_size - (i + j) >= 0) {
-                complete_data[data_index] = chunk_arr[j];
-                data_index += 1;
-            }
-            
-            // If page is filled up, write to flash
-            // Note: also has to check for padding when flashing release message
-            if (data_index >= FLASH_PAGESIZE) {
-                uart_write_hex_bytes(UART2, complete_data, 1024);
-
-                // Check for errors while writing to flash
-                do {
-                    // Write to flash, then check if data and memory match
-                    if (program_flash(page_addr, complete_data, data_index) == -1){
-                        uart_write_str(UART2, "Error while writing\n");
-                        uart_write(UART1, TYPE);
-                        uart_write(UART1, ERROR);
-                        error = 1;
-                    } else if (memcmp(complete_data, (void *) page_addr, data_index) != 0){
-                        uart_write_str(UART2, "Error while writing\n");
-                        uart_write(UART1, TYPE);
-                        uart_write(UART1, ERROR);
-                        error = 1;
-                    }
-                    
-                    // Error timeout
-                    error_counter += error;
-                    if (error_counter > 10){
-                        uart_write_str(UART2, "Timeout: too many errors\n");
-                        uart_write(UART1, TYPE);
-                        uart_write(UART1, END);
-                        SysCtlReset();
-                        return;
-                    }
-                } while(error != 0);
-                
-                // Write success and debugging messages to UART2.
-                uart_write_str(UART2, "Page successfully programmed\nAddress: ");
-                uart_write_hex(UART2, page_addr);
-                uart_write_str(UART2, "\nBytes: ");
-                uart_write_hex(UART2, data_index);
-                nl(UART2);
-
-                // Update to next page
-                page_addr += FLASH_PAGESIZE;
-                data_index = 0;
-            }
+        if (f_size - i < FLASH_PAGESIZE) {
+            data_index = f_size - i;
+        } else {
+            data_index = FLASH_PAGESIZE;
         }
 
-        // Send packet recieved success message
-        uart_write(UART1, TYPE);
-        uart_write(UART1, OK);
-
-        // Reset counter inbetween packets
-        error_counter = 0;
-    }
-
-    // ************************************************************
-    // Process RELEASE MESSAGE frames
-    for (int i = 0; i < r_size; i += 15){
-        // Read and check for errors
-        do{
-            // Read frames
-            int read = 0;
-            for (int i = 0; i < 16; i += 1) {
-                chunk_arr[i] = uart_read(UART1, BLOCKING, &read);
-            }
-
-            // Check for errors
-            if (error == 1){
-                uart_write_str(UART2, "Incorrect GHASH\n");
+        // Writing to flash
+        do {
+            // Write to flash, then check if data and memory match
+            if (program_flash(page_addr, data, data_index) == -1){
+                uart_write_str(UART2, "Error while writing\n");
                 uart_write(UART1, TYPE);
                 uart_write(UART1, ERROR);
-            } else if (chunk_arr[0] != 2){
-                uart_write_str(UART2, "Incorrect Message Type\n");
+                error = 1;
+            } else if (memcmp(data, (void *) page_addr, data_index) != 0){
+                uart_write_str(UART2, "Error while writing\n");
                 uart_write(UART1, TYPE);
                 uart_write(UART1, ERROR);
                 error = 1;
             }
-
+                    
             // Error timeout
             error_counter += error;
-            if (error_counter > 10) {
+            if (error_counter > 10){
                 uart_write_str(UART2, "Timeout: too many errors\n");
                 uart_write(UART1, TYPE);
                 uart_write(UART1, END);
                 SysCtlReset();
                 return;
             }
-        } while (error != 0);
+        } while(error != 0);
 
-         // Write that packet has been recieved
-        uart_write_str(UART2, "Recieved bytes at ");
-        uart_write_hex(UART2, i);
+        // Write success and debugging messages to UART2.
+        uart_write_str(UART2, "Page successfully programmed\nAddress: ");
+        uart_write_hex(UART2, page_addr);
+        uart_write_str(UART2, "\nBytes: ");
+        uart_write_hex(UART2, data_index);
         nl(UART2);
 
-        // Writing to flash
-        for (int j = 1; j < 16; j++) {
-            // Get the data that will be written
-            if (r_size - (i + j) >= 0) {
-                complete_data[data_index] = chunk_arr[j];
-                data_index += 1;
-            }
-
-            // If page is filled up or at end of release message, write to flash
-            if ((data_index >= FLASH_PAGESIZE - 1) || (r_size - i == j)) {
-                uart_write_hex_bytes(UART2, complete_data, 1024);
-
-                // Check for errors while writing to flash
-                do {
-                    // Write to flash, then check if data and memory match
-                    if (program_flash(page_addr, complete_data, data_index) == -1){
-                        uart_write_str(UART2, "Error while writing\n");
-                        uart_write(UART1, TYPE);
-                        uart_write(UART1, ERROR);
-                        error = 1;
-                    } else if (memcmp(complete_data, (void *) page_addr, data_index) != 0){
-                        uart_write_str(UART2, "Error while writing\n");
-                        uart_write(UART1, TYPE);
-                        uart_write(UART1, ERROR);
-                        error = 1;
-                    }
-                    
-                    // Error timeout
-                    error_counter += error;
-                    if (error_counter > 10){
-                        uart_write_str(UART2, "Timeout: too many errors\n");
-                        uart_write(UART1, TYPE);
-                        uart_write(UART1, END);
-                        SysCtlReset();
-                        return;
-                    }
-                } while(error != 0);
-                
-                // Write success and debugging messages to UART2.
-                uart_write_str(UART2, "Page successfully programmed\nAddress: ");
-                uart_write_hex(UART2, page_addr);
-                uart_write_str(UART2, "\nBytes: ");
-                uart_write_hex(UART2, data_index);
-                nl(UART2);
-
-                // Update to next page
-                page_addr += FLASH_PAGESIZE;
-                data_index = 0;
-            }
-        }
+        // Update to next page
+        page_addr += FLASH_PAGESIZE;
+        data_index = 0;
 
         // Send packet recieved success message
         uart_write(UART1, TYPE);
@@ -545,43 +410,8 @@ void load_firmware(void){
     }
 
     // ************************************************************
-    // Process END frame
-    do {
-        // Read frame
-        int read = 0;
-        for (int i = 0; i < 16; i += 1) {
-            chunk_arr[i] = uart_read(UART1, BLOCKING, &read);
-        }
-
-        // Check for errors
-        if (error == 1){
-            uart_write_str(UART2, "Incorrect GHASH\n");
-            uart_write(UART1, TYPE);
-            uart_write(UART1, ERROR);
-        } else if (chunk_arr[0] != 3){
-            uart_write_str(UART2, "Incorrect Message Type\n");
-            uart_write(UART1, TYPE);
-            uart_write(UART1, ERROR);
-            error = 1;
-        }
-
-        // Error timeout
-        error_counter += error;
-        if (error_counter > 10) {
-            uart_write_str(UART2, "Timeout: too many errors\n");
-            uart_write(UART1, TYPE);
-            uart_write(UART1, END);
-            SysCtlReset();
-            return;
-        }
-
-    } while (error != 0);
-
+    // Send success
     uart_write_str(UART2, "End frame processed\n\n(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧\n");
-
-    // End return
-    uart_write(UART1, TYPE);
-    uart_write(UART1, OK);
     
     uart_write_str(UART2, "Received Firmware Version: ");
     uart_write_hex(UART2, version);
@@ -591,6 +421,7 @@ void load_firmware(void){
     uart_write_hex(UART2, f_size);
     return;
 }
+
 
 /* ****************************************************************
  *
