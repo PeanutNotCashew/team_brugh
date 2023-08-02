@@ -34,17 +34,14 @@ def randPad(data, size):
 # Returns the encypted data
 def encrypt(data, key, header):
     # Set up the AES object with the key, mode, and header/aad
-    cipher = AES.new(key, AES.MODE_CBC)
 
     h = SHA256.new()
+    print(len(data))
     h.update(data)
 
-    # Encrypts the data
-    ciphertext = cipher.encrypt(data)
     print(h.digest())
-    print(ciphertext)
     # Returns encrypted data, tag, and nonce/IV
-    return(ciphertext + h.digest() + cipher.iv)
+    return(data + h.digest())
 
 # Packages the firmware
 # Takes firmware location, output location,
@@ -106,6 +103,7 @@ def protect_firmware(infile, outfile, version, message, secret):
     # Smush the START frame, encrypted firmware and RM, and END frame together
     firmware_blob = begin + fwEncrypt + rmEncrypt
     print(firmware_blob)
+    print(len(firmware_blob))
     # Write encrypted firmware blob to outfile
     with open(outfile, 'wb+') as outfile:
         outfile.write(firmware_blob)
