@@ -65,11 +65,11 @@ def protect_firmware(infile, outfile, version, message, secret):
         # Check if the firmware fills a full 0xF chunk
         if ((len(firmware) - i) // 15 != 0):
             temp = p8(2, endian = "little") + firmware[i : i + 15] # Message type + firmware
-            fwEncrypt += temp
+            fwEncrypt += encrypt(temp, key, header)
     # If the last chunk is not a 0xF chunk, pads and encrypts
     if (len(firmware) % 15 != 0):
         temp = randPad((p8(2, endian = "little") + firmware[i : len(firmware)]), 16) # Message type + firmware + padding
-        fwEncrypt += temp
+        fwEncrypt += encrypt(temp, key, header)
 
     # Encrypt the release message
     messageBin = message.encode()
@@ -80,22 +80,22 @@ def protect_firmware(infile, outfile, version, message, secret):
         # Check if message fills a full 0xF chunk
         if ((len(messageBin) - i) // 15 != 0):
             temp = p8(2, endian = "little") + messageBin[i : i + 15] # Type and RM
-            rmEncrypt += temp
+            rmEncrypt += encrypt(temp, key, header)
 
     # If the last chunk is not a 0xF chunk, pads and encrypts
     if (len(messageBin) % 15 != 0):
         temp = randPad((p8(2, endian = "little") + messageBin[i : len(firmware)]), 16) # Type, RM, null byte, and padding
-        rmEncrypt += temp
+        rmEncrypt += encrypt(temp, key, header)
 
     # Create START frame
     # Temp is the type + version num + firmware len + RM len + padding
-    temp = randPad(p8(1, endian = "little") + p16(version, endian = "little") + p16(len(firmware), endian = "little") + p16(len(message), endian = "little"), 16)
-    begin = temp
+    temp = randPad(p8(1, endian = "little") + p16(version, endian = "little") + p16(len(firmware), endian = "little") + p16(len(messageBin), endian = "little"), 16)
+    begin = encrypt(temp, key, header)
 
     # Create END frame
     # Temp is the type + padding
     temp = randPad(p8(3, endian = "little"), 16)
-    end = temp
+    end = encrypt(temp, key, header)
 
     # For debugging?
     # print(begin)
