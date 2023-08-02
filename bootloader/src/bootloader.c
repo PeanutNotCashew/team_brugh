@@ -276,6 +276,9 @@ void load_firmware(void){
 
         sha_hash(data, FLASH_PAGESIZE, gen_hash);
 
+        uart_write_str(UART2, gen_hash);
+        uart_write_str(UART2, tag);
+
         if (gen_hash == tag) {
             uart_write(UART1, TYPE);
             uart_write(UART1, OK);
