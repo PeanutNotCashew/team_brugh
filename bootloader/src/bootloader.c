@@ -192,8 +192,9 @@ int frame_decrypt(unsigned char *arr, uint8_t type){
 
     // Packet components: each is 16 bytes
     // The data array is not declared here, as it is a parameter
-    char tag[16];
-    char nonce[16];
+    char gen_hash[64];
+    char tag[64];
+    char iv[16];
 
     // Reads the packet
     type = uart_read(UART1, BLOCKING, &read);     // Message Type
@@ -201,28 +202,29 @@ int frame_decrypt(unsigned char *arr, uint8_t type){
         rcv = uart_read(UART1, BLOCKING, &read);
         arr[i] = rcv;
     }
-    for (int i = 0; i < 16; i += 1) {             // Tag
+    for (int i = 0; i < 64; i += 1) {             // Tag
         rcv = uart_read(UART1, BLOCKING, &read);
         tag[i] = rcv;
     }
-    for (int i = 0; i < 16; i += 1) {             // Nonce
+    for (int i = 0; i < 16; i += 1) {             // IV
         rcv = uart_read(UART1, BLOCKING, &read);
-        nonce[i] = rcv;
+        iv[i] = rcv;
     }
 
     uart_write_str(UART2, "Stuff read\n");
 
-    uart_write_hex_bytes(UART2, nonce, 16);
+    uart_write_hex_bytes(UART2, iv, 16);
 
     uart_write_str(UART2, "arr\n");
     uart_write_hex_bytes(UART2, arr, 1024);
 
-    int no_error = gcm_decrypt_and_verify(KEY, nonce, (char *)arr, FLASH_PAGESIZE, HEADER, 16, tag);
-
+    // Encrypt
+    aes_encrypt(KEY, iv, (char *)arr, FLASH_PAGESIZE);
     uart_write_str(UART2, "Stuff decoded\n");
 
-    // Check GHASH
-    if (no_error) {
+    // Check hash
+    sha_hash(arr, FLASH_PAGESIZE, gen_hash);
+    if (gen_hash == tag) {
         return 0;
     } else {
         return 1;
