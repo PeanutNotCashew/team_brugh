@@ -185,7 +185,7 @@ void load_initial_firmware(void){
  * 
  * ****************************************************************
  */
-int frame_decrypt(uint8_t *arr){
+int frame_decrypt(uint8_t *arr, br_gcm_context *ctx){
     // Misc vars for reading
     int read = 0;
     uint32_t rcv = 0;
@@ -209,22 +209,14 @@ int frame_decrypt(uint8_t *arr){
         nonce[i] = rcv;
     }
 
-    // Initialize the GCM, with counter and GHASH
-    br_aes_ct_ctr_keys counter;
-    br_gcm_context context;
-    br_aes_ct_ctr_init(&counter, KEY, 16); // Note: KEY is a macro in keys.h
-    br_gcm_init(&context, &counter.vtable, br_ghash_ctmul32);
-
-    // Add nonce and header
-    br_gcm_reset(&context, nonce, 16);
-    br_gcm_aad_inject(&context, HEADER, 16); // HEADER is also a macro in keys.h
-    br_gcm_flip(&context);
-
-    // Decrypt data
-    br_gcm_run(&context, 0, arr, 16);
+    // Add nonce and decrypt data
+    br_gcm_reset(ctx, nonce, 16);
+    br_gcm_aad_inject(ctx, HEADER, 16);
+    br_gcm_flip(ctx);
+    br_gcm_run(ctx, 0, arr, 16);
 
     // Check GHASH
-    if (br_gcm_check_tag(&context, tag)) {
+    if (br_gcm_check_tag(ctx, tag)) {
         return 0;
     } else {
         return 1;
@@ -247,7 +239,7 @@ void load_firmware(void){
     int error;              // stores frame_decrypt return
     int error_counter = 0;
 
-    uint32_t data_index = 0;            // Length of current data chunk written to flash
+    uint32_t data_index = 0;        // Length of current data chunk written to flash
     uint32_t page_addr = FW_BASE;   // Address to write to in flash
 
     // variables to store data from START frame
@@ -255,11 +247,17 @@ void load_firmware(void){
     uint16_t f_size;
     uint16_t r_size;
 
+    // Setting up GCM
+    br_aes_ct_ctr_keys counter;
+    br_gcm_context context;
+    br_aes_ct_ctr_init(&counter, KEY, 16);                    // Set up AES CTR
+    br_gcm_init(&context, &counter.vtable, br_ghash_ctmul32); // Set up GCM
+
     // ************************************************************
     // Read START frame and checks for errors
     do {
         // Read frame
-        error = frame_decrypt(data_arr);
+        error = frame_decrypt(data_arr, &context);
 
         // Get version (0x2)
         version = (uint16_t)data_arr[1];
@@ -337,7 +335,7 @@ void load_firmware(void){
         // Reading and checking for errors
         do {
             // Read frames
-            error = frame_decrypt(data_arr);
+            error = frame_decrypt(data_arr, &context);
 
             // Error handling
             if (error == 1){
@@ -434,7 +432,7 @@ void load_firmware(void){
         // Read and check for errors
         do{
             // Read frames
-            error = frame_decrypt(data_arr);
+            error = frame_decrypt(data_arr, &context);
 
             // Check for errors
             if (error == 1){
@@ -527,7 +525,7 @@ void load_firmware(void){
     // Process END frame
     do {
         // Read frame
-        error = frame_decrypt(data_arr);
+        error = frame_decrypt(data_arr, &context);
 
         // Check for errors
         if (error == 1){
