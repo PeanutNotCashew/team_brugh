@@ -39,7 +39,7 @@ def encrypt(data, key, header):
     print(len(data))
     h.update(data)
 
-    print(h.digest())
+    print(h.hexdigest())
     # Returns encrypted data, tag, and nonce/IV
     return(data + h.digest())
 
