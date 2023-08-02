@@ -130,7 +130,7 @@ if __name__ == "__main__":
 
     # Open UART 2
     uart2_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    #uart2_sock.connect(UART2_PATH)
+    uart2_sock.connect(UART2_PATH)
 
     # Close unused UARTs 0 & 2 (if we leave these open it will hang)
     uart0_sock.close()

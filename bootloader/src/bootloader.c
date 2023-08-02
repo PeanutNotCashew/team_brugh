@@ -210,13 +210,14 @@ int frame_decrypt(unsigned char *arr, uint8_t type){
         nonce[i] = rcv;
     }
 
-<<<<<<< Updated upstream
-    int no_error = gcm_decrypt_and_verify(KEY, nonce, (char*) arr, FLASH_PAGESIZE, HEADER, 16, tag);
-=======
     uart_write_str(UART2, "Stuff read\n");
 
-    int no_error = gcm_decrypt_and_verify(KEY, nonce, arr, FLASH_PAGESIZE, HEADER, 16, tag);
->>>>>>> Stashed changes
+    uart_write_hex_bytes(UART2, nonce, 16);
+
+    uart_write_str(UART2, "arr\n");
+    uart_write_hex_bytes(UART2, arr, 1024);
+
+    int no_error = gcm_decrypt_and_verify(KEY, nonce, (char *)arr, FLASH_PAGESIZE, HEADER, 16, tag);
 
     uart_write_str(UART2, "Stuff decoded\n");
 
