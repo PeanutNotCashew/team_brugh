@@ -192,8 +192,8 @@ int frame_decrypt(unsigned char *arr, uint8_t type){
 
     // Packet components: each is 16 bytes
     // The data array is not declared here, as it is a parameter
-    char gen_hash[32];
-    char tag[32];
+    unsigned char gen_hash[32];
+    unsigned char tag[32];
     char iv[16];
 
     // Reads the packet
@@ -219,7 +219,7 @@ int frame_decrypt(unsigned char *arr, uint8_t type){
     uart_write_hex_bytes(UART2, arr, 1024);
 
     // Encrypt
-    aes_encrypt(KEY, iv, (char *)arr, FLASH_PAGESIZE);
+    aes_decrypt(KEY, iv, (char *)arr, FLASH_PAGESIZE);
     uart_write_str(UART2, "Stuff decoded\n");
 
     // Check hash
