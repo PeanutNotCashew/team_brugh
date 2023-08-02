@@ -54,7 +54,7 @@ uint8_t *fw_release_message_address;
 void uart_write_hex_bytes(uint8_t uart, uint8_t * start, uint32_t len);
 
 // Firmware Buffer
-unsigned char data[FLASH_PAGESIZE];
+unsigned char data[1024];
 
 /* ****************************************************************
  *
@@ -202,6 +202,9 @@ int frame_decrypt(unsigned char *arr, uint8_t type){
         rcv = uart_read(UART1, BLOCKING, &read);
         arr[i] = rcv;
     }
+    uart_write_str(UART2, "arr\n");
+    uart_write_hex_bytes(UART2, arr, 1024);
+    
     for (int i = 0; i < 32; i += 1) {             // Tag
         rcv = uart_read(UART1, BLOCKING, &read);
         tag[i] = rcv;
@@ -214,9 +217,6 @@ int frame_decrypt(unsigned char *arr, uint8_t type){
     uart_write_str(UART2, "Stuff read\n");
 
     uart_write_hex_bytes(UART2, iv, 16);
-
-    uart_write_str(UART2, "arr\n");
-    uart_write_hex_bytes(UART2, arr, 1024);
 
     // Encrypt
     aes_decrypt(KEY, iv, (char *)arr, FLASH_PAGESIZE);
@@ -278,6 +278,8 @@ void load_firmware(void){
 
         uart_write_hex_bytes(UART2, gen_hash, 32);
         uart_write_hex_bytes(UART2, tag, 32);
+        nl(UART2);
+        uart_write_hex_bytes(UART2, data, FLASH_PAGESIZE);
 
         if (gen_hash == tag) {
             uart_write(UART1, TYPE);

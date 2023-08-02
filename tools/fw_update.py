@@ -38,7 +38,7 @@ def send_frame(ser, frame, debug=False):
 
     # If debug mode on, prints out frame to be sent
     if debug:
-        print_hex(frame[1025:])
+        print_hex(frame)
 
     falsetimes = 0 # Error counter
     failed = True # Stores if sent frame was successful
@@ -49,6 +49,7 @@ def send_frame(ser, frame, debug=False):
         if falsetimes >= 10:
             raise RuntimeError("Invalid frame sent too many times, aborting")
         
+        print_hex(frame + b"\n")
         # Send frame to serial
         ser.write(frame) 
         
