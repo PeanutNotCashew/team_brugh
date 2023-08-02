@@ -186,7 +186,7 @@ void load_initial_firmware(void){
  * 
  * ****************************************************************
  */
-int frame_decrypt(uint8_t *arr){
+int frame_decrypt(uint8_t *arr, br_gcm_context *ctx){
     // Misc vars for reading
     int read = 0;
     uint32_t rcv = 0;
@@ -210,32 +210,14 @@ int frame_decrypt(uint8_t *arr){
         nonce[i] = rcv;
     }
 
-    /*
-    for (int i = 0; i < 1024; i += 1) {
-        backup[i] = complete_data[i];
-    }*/
-
-    // Initialize the GCM, with counter and GHASH
-    br_aes_ct_ctr_keys counter;
-    br_gcm_context context;
-    br_aes_ct_ctr_init(&counter, KEY, 16); // Note: KEY is a macro in keys.h
-    br_gcm_init(&context, &counter.vtable, br_ghash_ctmul32);
-
-    // Add nonce and header
-    br_gcm_reset(&context, nonce, 16);
-    br_gcm_aad_inject(&context, HEADER, 16); // HEADER is also a macro in keys.h
-    br_gcm_flip(&context);
-
-    // Decrypt data
-    br_gcm_run(&context, 0, arr, 16);
-
-    /*for (int i = 0; i < 1024; i += 1) {
-        complete_data[i] = backup[i];
-    }
-    */
+    // Add nonce and decrypt data
+    br_gcm_reset(ctx, nonce, 16);
+    br_gcm_aad_inject(ctx, HEADER, 16);
+    br_gcm_flip(ctx);
+    br_gcm_run(ctx, 0, arr, 16);
 
     // Check GHASH
-    if (br_gcm_check_tag(&context, tag)) {
+    if (br_gcm_check_tag(ctx, tag)) {
         return 0;
     } else {
         return 1;
@@ -266,14 +248,17 @@ void load_firmware(void){
     uint16_t f_size;
     uint16_t r_size;
 
+    // Initialize the GCM, with counter and GHASH
+    br_aes_ct_ctr_keys counter;
+    br_gcm_context context;
+    br_aes_ct_ctr_init(&counter, KEY, 16); // Note: KEY is a macro in keys.h
+    br_gcm_init(&context, &counter.vtable, br_ghash_ctmul32);
+
     // ************************************************************
     // Read START frame and checks for errors
     do {
         // Read frame
-        int read = 0;
-        for (int i = 0; i < 16; i += 1) {
-            chunk_arr[i] = uart_read(UART1, BLOCKING, &read);
-        }
+        error = frame_decrypt(chunk_arr, &context);
 
         // Get version (0x2)
         version = (uint16_t)chunk_arr[1];
@@ -351,11 +336,8 @@ void load_firmware(void){
     for (int i = 0; i < f_size; i += 15){
         // Reading and checking for errors
         do {
-            // Read frames
-            int read = 0;
-            for (int i = 0; i < 16; i += 1) {
-                chunk_arr[i] = uart_read(UART1, BLOCKING, &read);
-            }
+            // Read frame
+            error = frame_decrypt(chunk_arr, &context);
 
             // Error handling
             if (error == 1){
@@ -451,11 +433,8 @@ void load_firmware(void){
     for (int i = 0; i < r_size; i += 15){
         // Read and check for errors
         do{
-            // Read frames
-            int read = 0;
-            for (int i = 0; i < 16; i += 1) {
-                chunk_arr[i] = uart_read(UART1, BLOCKING, &read);
-            }
+            // Read frame
+            error = frame_decrypt(chunk_arr, &context);
 
             // Check for errors
             if (error == 1){
@@ -548,10 +527,7 @@ void load_firmware(void){
     // Process END frame
     do {
         // Read frame
-        int read = 0;
-        for (int i = 0; i < 16; i += 1) {
-            chunk_arr[i] = uart_read(UART1, BLOCKING, &read);
-        }
+        error = frame_decrypt(chunk_arr, &context);
 
         // Check for errors
         if (error == 1){
