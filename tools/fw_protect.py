@@ -11,6 +11,8 @@ import argparse
 import random
 from Crypto.Cipher import AES
 from pwn import *
+from Crypto.Hash import SHA256
+
 
 # Pads the input data using random characters
 # Takes the data to be padded, and the completed size
@@ -32,14 +34,17 @@ def randPad(data, size):
 # Returns the encypted data
 def encrypt(data, key, header):
     # Set up the AES object with the key, mode, and header/aad
-    cipher = AES.new(key, AES.MODE_GCM)
-    cipher.update(header)
+    cipher = AES.new(key, AES.MODE_CBC)
+
+    h = SHA256.new()
+    h.update(data)
 
     # Encrypts the data
-    ciphertext, tag = cipher.encrypt_and_digest(data)
-    
+    ciphertext = cipher.encrypt(data)
+    print(h.digest())
+    print(ciphertext)
     # Returns encrypted data, tag, and nonce/IV
-    return(ciphertext + tag + cipher.nonce)
+    return(ciphertext + h.digest() + cipher.iv)
 
 # Packages the firmware
 # Takes firmware location, output location,
