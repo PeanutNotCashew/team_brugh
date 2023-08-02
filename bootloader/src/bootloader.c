@@ -192,8 +192,8 @@ int frame_decrypt(unsigned char *arr, uint8_t type){
 
     // Packet components: each is 16 bytes
     // The data array is not declared here, as it is a parameter
-    char gen_hash[64];
-    char tag[64];
+    char gen_hash[32];
+    char tag[32];
     char iv[16];
 
     // Reads the packet
@@ -202,7 +202,7 @@ int frame_decrypt(unsigned char *arr, uint8_t type){
         rcv = uart_read(UART1, BLOCKING, &read);
         arr[i] = rcv;
     }
-    for (int i = 0; i < 64; i += 1) {             // Tag
+    for (int i = 0; i < 32; i += 1) {             // Tag
         rcv = uart_read(UART1, BLOCKING, &read);
         tag[i] = rcv;
     }
