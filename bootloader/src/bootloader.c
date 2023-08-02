@@ -185,15 +185,15 @@ void load_initial_firmware(void){
  * 
  * ****************************************************************
  */
-int frame_decrypt(uint8_t *arr, uint8_t type){
+int frame_decrypt(unsigned char *arr, uint8_t type){
     // Misc vars for reading
     int read = 0;
     uint32_t rcv = 0;
 
     // Packet components: each is 16 bytes
     // The data array is not declared here, as it is a parameter
-    uint8_t tag[16];
-    uint8_t nonce[16];
+    char tag[16];
+    char nonce[16];
 
     // Reads the packet
     type = uart_read(UART1, BLOCKING, &read);     // Message Type
@@ -210,7 +210,7 @@ int frame_decrypt(uint8_t *arr, uint8_t type){
         nonce[i] = rcv;
     }
 
-    int no_error = gcm_decrypt_and_verify(KEY, nonce, arr, FLASH_PAGESIZE, HEADER, 16, tag);
+    int no_error = gcm_decrypt_and_verify(KEY, nonce, (char*) arr, FLASH_PAGESIZE, HEADER, 16, tag);
 
     // Check GHASH
     if (no_error) {
@@ -232,7 +232,7 @@ int frame_decrypt(uint8_t *arr, uint8_t type){
 void load_firmware(void){
     uart_write_str(UART2, "\nUpdate started\n");
 
-    uint8_t type;
+    uint8_t type = 0;
     int error = 0;              // stores frame_decrypt return
     int error_counter = 0;
 
@@ -248,23 +248,23 @@ void load_firmware(void){
     // Read START frame and checks for errors
     do {
         // Read frame
-        error = frame_decrypt(chunk_arr, type);
+        error = frame_decrypt(data, type);
 
         // Get version (0x2)
-        version = (uint16_t)chunk_arr[1];
-        version |= (uint16_t)chunk_arr[2] << 8;
+        version = (uint16_t)data[1];
+        version |= (uint16_t)data[2] << 8;
         uart_write_str(UART2, "Received Firmware Version: ");
         uart_write_hex(UART2, version);
         nl(UART2);
         // Get release message size in bytes (0x2)
-        r_size = (uint16_t)chunk_arr[5];
-        r_size |= (uint16_t)chunk_arr[6] << 8;
+        r_size = (uint16_t)data[5];
+        r_size |= (uint16_t)data[6] << 8;
         uart_write_str(UART2, "Received Release Message Size: ");
         uart_write_hex(UART2, r_size);
         nl(UART2);
         // Get firmware size in bytes (0x2) 
-        f_size = (uint16_t)chunk_arr[3];
-        f_size |= (uint16_t)chunk_arr[4] << 8;
+        f_size = (uint16_t)data[3];
+        f_size |= (uint16_t)data[4] << 8;
         uart_write_str(UART2, "Received Firmware Size: ");
         uart_write_hex(UART2, f_size);
         nl(UART2);

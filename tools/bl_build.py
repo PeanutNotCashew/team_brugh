@@ -82,8 +82,8 @@ if __name__ == "__main__":
     # Writes AES key and header to C header file
     with open("../bootloader/keys.h", "w") as file:
         file.write('#ifndef KEYS_H' + "\n")
-        file.write('#define KEY (const uint8_t[]) ' + arrayize(aes_key) + "\n")
-        file.write('#define HEADER (const uint8_t[]) ' + arrayize(header) + "\n")
+        file.write('#define KEY (char []) ' + arrayize(aes_key) + "\n")
+        file.write('#define HEADER (char []) ' + arrayize(header) + "\n")
         file.write('#endif')
     
     # Copies firmware and builds bootloader
