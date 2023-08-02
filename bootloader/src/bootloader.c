@@ -258,8 +258,32 @@ void load_firmware(void){
     // ************************************************************
     // Read START frame and checks for errors
     do {
-        // Read frame
-        error = frame_decrypt(data, type);
+        int read = 0;
+        uint8_t rcv = 0;
+
+        unsigned char gen_hash[32];
+        unsigned char tag[32];
+
+        type = uart_read(UART1, BLOCKING, &read);     // Message Type
+        for (int i = 0; i < FLASH_PAGESIZE; i += 1) { // Data
+            rcv = uart_read(UART1, BLOCKING, &read);
+            data[i] = rcv;
+        }
+        for (int i = 0; i < 32; i += 1) {             // Tag
+            rcv = uart_read(UART1, BLOCKING, &read);
+            tag[i] = rcv;
+        }
+
+        sha_hash(data, FLASH_PAGESIZE, gen_hash);
+        if (gen_hash == data) {
+            uart_write(UART1, TYPE);
+            uart_write(UART1, OK);
+        } else {
+            uart_write(UART1, TYPE);
+            uart_write(UART1, END);
+        }
+
+        return;
 
         // Get version (0x2)
         version = (uint16_t)data[1];
