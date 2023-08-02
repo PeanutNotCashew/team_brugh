@@ -54,8 +54,7 @@ uint8_t *fw_release_message_address;
 void uart_write_hex_bytes(uint8_t uart, uint8_t * start, uint32_t len);
 
 // Firmware Buffer
-unsigned char complete_data[FLASH_PAGESIZE];
-unsigned char backup[FLASH_PAGESIZE];
+unsigned char data[FLASH_PAGESIZE];
 
 /* ****************************************************************
  *
@@ -212,7 +211,7 @@ int frame_decrypt(uint8_t *arr){
 
     /*
     for (int i = 0; i < 1024; i += 1) {
-        backup[i] = complete_data[i];
+        backup[i] = data[i];
     }*/
 
     // Initialize the GCM, with counter and GHASH
@@ -230,7 +229,7 @@ int frame_decrypt(uint8_t *arr){
     br_gcm_run(&context, 0, arr, 16);
 
     /*for (int i = 0; i < 1024; i += 1) {
-        complete_data[i] = backup[i];
+        data[i] = backup[i];
     }
     */
 
@@ -255,6 +254,7 @@ void load_firmware(void){
     uart_write_str(UART2, "\nUpdate started\n");
 
     uint8_t chunk_arr[16];   // Stores 1 packet, and is overwritten every decrypt
+    uint8_t type = 0;
     int error = 0;              // stores frame_decrypt return
     int error_counter = 0;
 
@@ -269,11 +269,39 @@ void load_firmware(void){
     // ************************************************************
     // Read START frame and checks for errors
     do {
-        // Read frame
-        int read = 0;
-        for (int i = 0; i < 16; i += 1) {
-            chunk_arr[i] = uart_read(UART1, BLOCKING, &read);
+int read = 0;
+        uint8_t rcv = 0;
+
+        unsigned char gen_hash[32];
+        unsigned char tag[32];
+
+        type = uart_read(UART1, BLOCKING, &read);     // Message Type
+        for (int i = 0; i < FLASH_PAGESIZE; i += 1) { // Data
+            rcv = uart_read(UART1, BLOCKING, &read);
+            data[i] = rcv;
         }
+        for (int i = 0; i < 32; i += 1) {             // Tag
+            rcv = uart_read(UART1, BLOCKING, &read);
+            tag[i] = rcv;
+        }
+
+        sha_hash(data, FLASH_PAGESIZE, gen_hash);
+
+        uart_write_hex_bytes(UART2, gen_hash, 32);
+        uart_write_hex_bytes(UART2, tag, 32);
+        nl(UART2);
+        uart_write_hex_bytes(UART2, data, FLASH_PAGESIZE);
+
+        if (gen_hash == tag) {
+            uart_write(UART1, TYPE);
+            uart_write(UART1, OK);
+        } else {
+            uart_write(UART1, TYPE);
+            uart_write(UART1, END);
+        }
+
+        return;
+
 
         // Get version (0x2)
         version = (uint16_t)chunk_arr[1];
@@ -390,24 +418,24 @@ void load_firmware(void){
         for (int j = 1; j < 16; j++) {
             // Get the data that will be written
             if (f_size - (i + j) >= 0) {
-                complete_data[data_index] = chunk_arr[j];
+                data[data_index] = chunk_arr[j];
                 data_index += 1;
             }
             
             // If page is filled up, write to flash
             // Note: also has to check for padding when flashing release message
             if (data_index >= FLASH_PAGESIZE) {
-                uart_write_hex_bytes(UART2, complete_data, 1024);
+                uart_write_hex_bytes(UART2, data, 1024);
 
                 // Check for errors while writing to flash
                 do {
                     // Write to flash, then check if data and memory match
-                    if (program_flash(page_addr, complete_data, data_index) == -1){
+                    if (program_flash(page_addr, data, data_index) == -1){
                         uart_write_str(UART2, "Error while writing\n");
                         uart_write(UART1, TYPE);
                         uart_write(UART1, ERROR);
                         error = 1;
-                    } else if (memcmp(complete_data, (void *) page_addr, data_index) != 0){
+                    } else if (memcmp(data, (void *) page_addr, data_index) != 0){
                         uart_write_str(UART2, "Error while writing\n");
                         uart_write(UART1, TYPE);
                         uart_write(UART1, ERROR);
@@ -489,23 +517,23 @@ void load_firmware(void){
         for (int j = 1; j < 16; j++) {
             // Get the data that will be written
             if (r_size - (i + j) >= 0) {
-                complete_data[data_index] = chunk_arr[j];
+                data[data_index] = chunk_arr[j];
                 data_index += 1;
             }
 
             // If page is filled up or at end of release message, write to flash
             if ((data_index >= FLASH_PAGESIZE - 1) || (r_size - i == j)) {
-                uart_write_hex_bytes(UART2, complete_data, 1024);
+                uart_write_hex_bytes(UART2, data, 1024);
 
                 // Check for errors while writing to flash
                 do {
                     // Write to flash, then check if data and memory match
-                    if (program_flash(page_addr, complete_data, data_index) == -1){
+                    if (program_flash(page_addr, data, data_index) == -1){
                         uart_write_str(UART2, "Error while writing\n");
                         uart_write(UART1, TYPE);
                         uart_write(UART1, ERROR);
                         error = 1;
-                    } else if (memcmp(complete_data, (void *) page_addr, data_index) != 0){
+                    } else if (memcmp(data, (void *) page_addr, data_index) != 0){
                         uart_write_str(UART2, "Error while writing\n");
                         uart_write(UART1, TYPE);
                         uart_write(UART1, ERROR);
