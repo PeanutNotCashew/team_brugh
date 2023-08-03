@@ -12,3 +12,4 @@ bootloader/**/*.axf
 bootloader/**/*.bin
 
 **/__pycache__/
+tools/gdb
