@@ -223,12 +223,15 @@ int frame_decrypt(unsigned char *arr, uint8_t type){
     uart_write_str(UART2, "Stuff decoded\n");
 
     // Check hash
+    int error = 0;
     sha_hash(arr, FLASH_PAGESIZE, gen_hash);
-    if (gen_hash == tag) {
-        return 0;
-    } else {
-        return 1;
+    for (int i = 0; i < 32; i += 1) {
+        if (gen_hash[i] != tag[i]) { // If not matching, error is True
+            error = 1;
+        }
     }
+    
+    return error;
 }
 
 /* ****************************************************************
@@ -281,12 +284,18 @@ void load_firmware(void){
         nl(UART2);
         uart_write_hex_bytes(UART2, data, FLASH_PAGESIZE);
 
-        if (gen_hash == tag) {
-            uart_write(UART1, TYPE);
-            uart_write(UART1, OK);
-        } else {
+        for (int i = 0; i < 32; i += 1) {
+            if (gen_hash[i] != tag[i]) { // If not matching, error is True
+                error = 1;
+            }
+        }
+
+        if (error) {
             uart_write(UART1, TYPE);
             uart_write(UART1, END);
+        } else {
+            uart_write(UART1, TYPE);
+            uart_write(UART1, OK);
         }
 
         return;
