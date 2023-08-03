@@ -286,22 +286,28 @@ void load_firmware(void){
             tag[i] = rcv;
         }
 
+        sha_hash(complete_data, 1024, gen_hash);
+
         // nl(UART2);
         uart_write_hex_bytes(UART2, complete_data, FLASH_PAGESIZE);
         nl(UART2);
         uart_write_hex_bytes(UART2, tag , 32);
-
-        sha_hash(complete_data, 1024, gen_hash);
         nl(UART2);
         uart_write_hex_bytes(UART2, gen_hash, 32);
         nl(UART2);
 
-        if (gen_hash == tag) {
-            uart_write(UART1, TYPE);
-            uart_write(UART1, OK);
-        } else {
+        for (int i = 0; i < 32; i += 0) {
+            if (gen_hash[i] != tag[1]){
+                error = 1;
+            }
+        }
+
+        if (error) {
             uart_write(UART1, TYPE);
             uart_write(UART1, END);
+        } else {
+            uart_write(UART1, TYPE);
+            uart_write(UART1, OK);
         }
 
         return;
