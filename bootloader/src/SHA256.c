@@ -48,13 +48,13 @@
 
 #if defined(MBEDTLS_SHA256_C) || defined(MBEDTLS_SHA224_C)
 
-#include "mbedtls/sha256.h"
-#include "mbedtls/platform_util.h"
-#include "mbedtls/error.h"
+#include "sha256.h"
+#include "platform_util.h"
+#include "error.h"
 
 #include <string.h>
 
-#include "mbedtls/platform.h"
+#include "platform.h"
 
 #if defined(__aarch64__)
 
