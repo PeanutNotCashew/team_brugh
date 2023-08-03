@@ -101,7 +101,7 @@ def protect_firmware(infile, outfile, version, message, secret):
     # print(begin)
     
     # Smush the START frame, encrypted firmware and RM, and END frame together
-    firmware_blob = begin + fwEncrypt + rmEncrypt
+    firmware_blob = fwEncrypt + rmEncrypt
     print(firmware_blob)
     print(len(firmware_blob))
     # Write encrypted firmware blob to outfile
